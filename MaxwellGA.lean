@@ -104,6 +104,14 @@ theorem gradeSelect_zero (r : ℕ) :
     gradeSelect Q (0 : CliffordAlgebra Q) r = 0 := by
   simp only [gradeSelect_eq_gradeSelectL]; exact map_zero (gradeSelectL Q r)
 
+theorem gradeSelect_neg (x : CliffordAlgebra Q) (r : ℕ) :
+    gradeSelect Q (-x) r = -(gradeSelect Q x r) := by
+  simp only [gradeSelect_eq_gradeSelectL]; exact map_neg (gradeSelectL Q r) x
+
+theorem gradeSelect_sub (x y : CliffordAlgebra Q) (r : ℕ) :
+    gradeSelect Q (x - y) r = gradeSelect Q x r - gradeSelect Q y r := by
+  simp only [gradeSelect_eq_gradeSelectL]; exact map_sub (gradeSelectL Q r) x y
+
 -- ── Idempotency ─────────────────────────────────────────────────────────────
 
 /-- Applying grade selection twice at the same grade is the same as applying it once.
@@ -133,6 +141,23 @@ theorem gradeSelect_of_ne {r s : ℕ} (hrs : r ≠ s) (x : CliffordAlgebra Q) :
   rw [DirectSum.decompose_of_mem_ne (extGrading (R := R) (M := M))
     (SetLike.coe_mem _) hrs]
   simp only [ZeroMemClass.coe_zero, map_zero]
+
+-- ── Linear-map-level composition lemmas ─────────────────────────────────────
+
+/-- The grade-`r` projection is idempotent as a linear map:
+`gradeSelectL Q r ∘ₗ gradeSelectL Q r = gradeSelectL Q r`. -/
+theorem gradeSelectL_idem (r : ℕ) :
+    (gradeSelectL Q r).comp (gradeSelectL Q r) = gradeSelectL Q r := by
+  ext x
+  show gradeSelect Q (gradeSelect Q x r) r = gradeSelect Q x r
+  exact gradeSelect_idem Q x r
+
+/-- Composing grade projections at different grades yields the zero map. -/
+theorem gradeSelectL_comp_of_ne {r s : ℕ} (hrs : r ≠ s) :
+    (gradeSelectL Q s).comp (gradeSelectL Q r) = 0 := by
+  ext x
+  show gradeSelect Q (gradeSelect Q x r) s = 0
+  exact gradeSelect_of_ne Q hrs x
 
 -- ============================================================================
 -- Part C.  Named projections (function and linear-map forms)
@@ -325,6 +350,42 @@ theorem smul_wedge (r : R) (a b : CliffordAlgebra Q) :
   unfold wedge; simp only [LinearEquiv.map_smul, Algebra.mul_smul_comm,
     Algebra.smul_mul_assoc, LinearEquiv.map_smul]
 
+/-- Scalar multiplication pulls out of the wedge product (right). -/
+theorem wedge_smul (r : R) (a b : CliffordAlgebra Q) :
+    wedge Q a (r • b) = r • wedge Q a b := by
+  unfold wedge; simp only [LinearEquiv.map_smul, Algebra.mul_smul_comm,
+    LinearEquiv.map_smul]
+
+/-- The wedge product of a vector with itself is zero,
+inherited from `ExteriorAlgebra.ι_sq_zero`. -/
+theorem wedge_ι_self (m : M) :
+    wedge Q (CliffordAlgebra.ι Q m) (CliffordAlgebra.ι Q m) = 0 := by
+  unfold wedge
+  have heq : CliffordAlgebra.equivExterior Q (CliffordAlgebra.ι Q m) =
+      ExteriorAlgebra.ι R m := by simp
+  rw [heq]
+  rw [ExteriorAlgebra.ι_sq_zero, map_zero]
+
+/-- Wedge distributes over subtraction on the left. -/
+theorem wedge_sub (a b c : CliffordAlgebra Q) :
+    wedge Q (a - b) c = wedge Q a c - wedge Q b c := by
+  unfold wedge; simp only [map_sub, sub_mul, map_sub]
+
+/-- Wedge distributes over subtraction on the right. -/
+theorem sub_wedge (a b c : CliffordAlgebra Q) :
+    wedge Q a (b - c) = wedge Q a b - wedge Q a c := by
+  unfold wedge; simp only [map_sub, mul_sub, map_sub]
+
+/-- Wedge with negation on the left. -/
+theorem neg_wedge (a b : CliffordAlgebra Q) :
+    wedge Q (-a) b = -(wedge Q a b) := by
+  unfold wedge; simp only [map_neg, neg_mul, map_neg]
+
+/-- Wedge with negation on the right. -/
+theorem wedge_neg (a b : CliffordAlgebra Q) :
+    wedge Q a (-b) = -(wedge Q a b) := by
+  unfold wedge; simp only [map_neg, mul_neg, map_neg]
+
 -- ============================================================================
 -- Part E.  Maxwell skeleton — "one line ⇒ grade-1 and grade-3 equations"
 -- ============================================================================
@@ -376,6 +437,28 @@ theorem Maxwell_gradeSelect
     (h : Maxwell1Line Q D F J) (r : ℕ) :
     ∀ x : X, gradeSelect Q (D F x) r = gradeSelect Q (J x) r :=
   fun x => congrArg (gradeSelect Q · r) (h x)
+
+/-- `Maxwell_splits` for the grade-0 (scalar) component. -/
+theorem Maxwell_grade0
+    (h : Maxwell1Line Q D F J) :
+    ∀ x : X, proj0 Q (D F x) = proj0 Q (J x) :=
+  fun x => congrArg (proj0 Q) (h x)
+
+/-- `Maxwell_splits` for the grade-2 (bivector) component. -/
+theorem Maxwell_grade2
+    (h : Maxwell1Line Q D F J) :
+    ∀ x : X, proj2 Q (D F x) = proj2 Q (J x) :=
+  fun x => congrArg (proj2 Q) (h x)
+
+/-- The one-line equation splits into four graded equations (grades 0 through 3). -/
+theorem Maxwell_splits_four
+    (h : Maxwell1Line Q D F J) :
+    (∀ x : X, proj0 Q (D F x) = proj0 Q (J x))
+    ∧ (∀ x : X, proj1 Q (D F x) = proj1 Q (J x))
+    ∧ (∀ x : X, proj2 Q (D F x) = proj2 Q (J x))
+    ∧ (∀ x : X, proj3 Q (D F x) = proj3 Q (J x)) :=
+  ⟨Maxwell_grade0 Q D F J h, Maxwell_grade1 Q D F J h,
+   Maxwell_grade2 Q D F J h, Maxwell_grade3 Q D F J h⟩
 
 /-- If the one-line equation holds and `D` is linear (commutes with grade selection),
 then one can extract graded equations directly on `F` and `J`. -/
@@ -431,5 +514,47 @@ theorem isHomogeneous_algebraMap (a : R) :
 theorem isHomogeneous_gradeSelect (x : CliffordAlgebra Q) (r : ℕ) :
     IsHomogeneous Q (gradeSelect Q x r) r :=
   gradeSelect_mem_rMultivector Q x r
+
+-- ── Closure under linear operations ─────────────────────────────────────────
+
+/-- The sum of two homogeneous elements of the same grade is homogeneous. -/
+theorem IsHomogeneous.add {x y : CliffordAlgebra Q} {r : ℕ}
+    (hx : IsHomogeneous Q x r) (hy : IsHomogeneous Q y r) :
+    IsHomogeneous Q (x + y) r := by
+  show (CliffordAlgebra.equivExterior Q) (x + y) ∈ extGrading (R := R) (M := M) r
+  rw [map_add]
+  exact Submodule.add_mem _ hx hy
+
+/-- A scalar multiple of a homogeneous element is homogeneous of the same grade. -/
+theorem IsHomogeneous.smul {x : CliffordAlgebra Q} {r : ℕ}
+    (hx : IsHomogeneous Q x r) (a : R) :
+    IsHomogeneous Q (a • x) r := by
+  show (CliffordAlgebra.equivExterior Q) (a • x) ∈ extGrading (R := R) (M := M) r
+  rw [LinearEquiv.map_smul]
+  exact Submodule.smul_mem _ a hx
+
+/-- The negation of a homogeneous element is homogeneous of the same grade. -/
+theorem IsHomogeneous.neg {x : CliffordAlgebra Q} {r : ℕ}
+    (hx : IsHomogeneous Q x r) :
+    IsHomogeneous Q (-x) r := by
+  show (CliffordAlgebra.equivExterior Q) (-x) ∈ extGrading (R := R) (M := M) r
+  rw [map_neg]
+  exact Submodule.neg_mem _ hx
+
+/-- The difference of two homogeneous elements of the same grade is homogeneous. -/
+theorem IsHomogeneous.sub {x y : CliffordAlgebra Q} {r : ℕ}
+    (hx : IsHomogeneous Q x r) (hy : IsHomogeneous Q y r) :
+    IsHomogeneous Q (x - y) r := by
+  show (CliffordAlgebra.equivExterior Q) (x - y) ∈ extGrading (R := R) (M := M) r
+  rw [map_sub]
+  exact Submodule.sub_mem _ hx hy
+
+/-- A finite sum of homogeneous elements of the same grade is homogeneous. -/
+theorem isHomogeneous_sum {ι : Type*} (s : Finset ι) (f : ι → CliffordAlgebra Q)
+    {r : ℕ} (hf : ∀ i ∈ s, IsHomogeneous Q (f i) r) :
+    IsHomogeneous Q (∑ i ∈ s, f i) r := by
+  show (CliffordAlgebra.equivExterior Q) (∑ i ∈ s, f i) ∈ extGrading (R := R) (M := M) r
+  rw [map_sum]
+  exact Submodule.sum_mem _ (fun i hi => hf i hi)
 
 end CliffordGA
