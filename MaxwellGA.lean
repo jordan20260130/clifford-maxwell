@@ -156,6 +156,110 @@ noncomputable def proj2L : CliffordAlgebra Q →ₗ[R] CliffordAlgebra Q := grad
 /-- Grade-3 projection as a linear map. -/
 noncomputable def proj3L : CliffordAlgebra Q →ₗ[R] CliffordAlgebra Q := gradeSelectL Q 3
 
+-- ── Linearity over sums ─────────────────────────────────────────────────────
+
+/-- Grade selection distributes over finite sums. -/
+theorem gradeSelect_sum {ι : Type*} (s : Finset ι) (f : ι → CliffordAlgebra Q) (r : ℕ) :
+    gradeSelect Q (∑ i ∈ s, f i) r = ∑ i ∈ s, gradeSelect Q (f i) r := by
+  simp only [gradeSelect_eq_gradeSelectL]; exact map_sum (gradeSelectL Q r) f s
+
+-- ── Interaction with algebra generators ─────────────────────────────────────
+
+/-- A vector `ι Q m` lives in grade 1 of the exterior algebra (after transport). -/
+theorem equivExterior_ι_mem_grade1 (m : M) :
+    (CliffordAlgebra.equivExterior Q (CliffordAlgebra.ι Q m)) ∈
+      extGrading (R := R) (M := M) 1 := by
+  show CliffordAlgebra.equivExterior Q (CliffordAlgebra.ι Q m) ∈
+    (LinearMap.range (ExteriorAlgebra.ι R : M →ₗ[R] ExteriorAlgebra R M)) ^ 1
+  simp only [pow_one]
+  rw [show CliffordAlgebra.equivExterior Q (CliffordAlgebra.ι Q m) =
+    ExteriorAlgebra.ι R m from by simp]
+  exact LinearMap.mem_range_self _ m
+
+/-- Grade-selecting a vector at grade 1 returns that vector. -/
+theorem gradeSelect_ι (m : M) :
+    gradeSelect Q (CliffordAlgebra.ι Q m) 1 = CliffordAlgebra.ι Q m := by
+  unfold gradeSelect
+  simp only [GradedAlgebra.proj_apply]
+  rw [DirectSum.decompose_of_mem_same (extGrading (R := R) (M := M))
+    (equivExterior_ι_mem_grade1 Q m)]
+  exact (CliffordAlgebra.equivExterior Q).symm_apply_apply _
+
+/-- Grade-selecting a vector at any grade other than 1 gives zero. -/
+theorem gradeSelect_ι_of_ne {r : ℕ} (hr : r ≠ 1) (m : M) :
+    gradeSelect Q (CliffordAlgebra.ι Q m) r = 0 := by
+  unfold gradeSelect
+  simp only [GradedAlgebra.proj_apply]
+  rw [DirectSum.decompose_of_mem_ne (extGrading (R := R) (M := M))
+    (equivExterior_ι_mem_grade1 Q m) (Ne.symm hr)]
+  simp only [ZeroMemClass.coe_zero, map_zero]
+
+/-- A scalar `algebraMap R (Cl Q) r` lives in grade 0 of the exterior algebra. -/
+theorem equivExterior_algebraMap_mem_grade0 (a : R) :
+    (CliffordAlgebra.equivExterior Q (algebraMap R (CliffordAlgebra Q) a)) ∈
+      extGrading (R := R) (M := M) 0 := by
+  have : CliffordAlgebra.equivExterior Q (algebraMap R (CliffordAlgebra Q) a) =
+      algebraMap R (ExteriorAlgebra R M) a := by simp
+  rw [this]
+  exact SetLike.algebraMap_mem_graded (extGrading (R := R) (M := M)) a
+
+/-- Grade-selecting a scalar at grade 0 returns that scalar. -/
+theorem gradeSelect_algebraMap (a : R) :
+    gradeSelect Q (algebraMap R (CliffordAlgebra Q) a) 0 =
+      algebraMap R (CliffordAlgebra Q) a := by
+  unfold gradeSelect
+  simp only [GradedAlgebra.proj_apply]
+  rw [DirectSum.decompose_of_mem_same (extGrading (R := R) (M := M))
+    (equivExterior_algebraMap_mem_grade0 Q a)]
+  exact (CliffordAlgebra.equivExterior Q).symm_apply_apply _
+
+/-- Grade-selecting a scalar at any nonzero grade gives zero. -/
+theorem gradeSelect_algebraMap_of_ne {r : ℕ} (hr : r ≠ 0) (a : R) :
+    gradeSelect Q (algebraMap R (CliffordAlgebra Q) a) r = 0 := by
+  unfold gradeSelect
+  simp only [GradedAlgebra.proj_apply]
+  rw [DirectSum.decompose_of_mem_ne (extGrading (R := R) (M := M))
+    (equivExterior_algebraMap_mem_grade0 Q a) (Ne.symm hr)]
+  simp only [ZeroMemClass.coe_zero, map_zero]
+
+/-- The unit `1` lives in grade 0. -/
+theorem gradeSelect_one :
+    gradeSelect Q (1 : CliffordAlgebra Q) 0 = 1 := by
+  rw [show (1 : CliffordAlgebra Q) = algebraMap R (CliffordAlgebra Q) 1 from
+    (algebraMap R (CliffordAlgebra Q)).map_one.symm]
+  exact gradeSelect_algebraMap Q 1
+
+/-- The unit `1` is invisible at nonzero grades. -/
+theorem gradeSelect_one_of_ne {r : ℕ} (hr : r ≠ 0) :
+    gradeSelect Q (1 : CliffordAlgebra Q) r = 0 := by
+  rw [show (1 : CliffordAlgebra Q) = algebraMap R (CliffordAlgebra Q) 1 from
+    (algebraMap R (CliffordAlgebra Q)).map_one.symm]
+  exact gradeSelect_algebraMap_of_ne Q hr 1
+
+-- ── Membership characterization ─────────────────────────────────────────────
+
+/-- An element is in `rMultivector Q r` iff grade-selecting at `r` gives it back. -/
+theorem mem_rMultivector_iff_gradeSelect (x : CliffordAlgebra Q) (r : ℕ) :
+    x ∈ rMultivector Q r ↔ gradeSelect Q x r = x := by
+  constructor
+  · intro hx
+    unfold gradeSelect
+    simp only [GradedAlgebra.proj_apply]
+    have : (CliffordAlgebra.equivExterior Q) x ∈ extGrading (R := R) (M := M) r := hx
+    rw [DirectSum.decompose_of_mem_same (extGrading (R := R) (M := M)) this]
+    exact (CliffordAlgebra.equivExterior Q).symm_apply_apply x
+  · intro hx
+    show (CliffordAlgebra.equivExterior Q) x ∈ extGrading (R := R) (M := M) r
+    rw [← hx]
+    unfold gradeSelect
+    simp only [LinearEquiv.apply_symm_apply, GradedAlgebra.proj_apply]
+    exact SetLike.coe_mem _
+
+/-- The grade-`r` projection of any element lies in `rMultivector Q r`. -/
+theorem gradeSelect_mem_rMultivector (x : CliffordAlgebra Q) (r : ℕ) :
+    gradeSelect Q x r ∈ rMultivector Q r :=
+  (mem_rMultivector_iff_gradeSelect Q _ r).mpr (gradeSelect_idem Q x r)
+
 -- ============================================================================
 -- Part D.  Wedge product
 -- ============================================================================
@@ -170,6 +274,56 @@ noncomputable def wedge (a b : CliffordAlgebra Q) : CliffordAlgebra Q :=
     (CliffordAlgebra.equivExterior Q a * CliffordAlgebra.equivExterior Q b)
 
 scoped infixl:70 " ⋏ " => CliffordGA.wedge _
+
+-- ── Wedge product properties ────────────────────────────────────────────────
+
+/-- The wedge product is associative, inherited from exterior algebra multiplication. -/
+theorem wedge_assoc (a b c : CliffordAlgebra Q) :
+    wedge Q (wedge Q a b) c = wedge Q a (wedge Q b c) := by
+  unfold wedge
+  simp only [LinearEquiv.apply_symm_apply, mul_assoc]
+
+/-- Wedging with zero on the left gives zero. -/
+theorem zero_wedge (b : CliffordAlgebra Q) : wedge Q 0 b = 0 := by
+  unfold wedge; simp only [map_zero, zero_mul, map_zero]
+
+/-- Wedging with zero on the right gives zero. -/
+theorem wedge_zero (a : CliffordAlgebra Q) : wedge Q a 0 = 0 := by
+  unfold wedge; simp only [map_zero, mul_zero, map_zero]
+
+/-- `equivExterior` sends `1` to `1`.  (`equivExterior` is only a `LinearEquiv`,
+but the underlying `changeForm` preserves `1`.) -/
+private theorem equivExterior_one :
+    (CliffordAlgebra.equivExterior Q) 1 = 1 := by
+  simp [CliffordAlgebra.changeFormEquiv_apply, CliffordAlgebra.changeForm_one]
+
+/-- Wedging with `1` on the left is the identity. -/
+theorem one_wedge (b : CliffordAlgebra Q) : wedge Q 1 b = b := by
+  unfold wedge
+  rw [equivExterior_one Q, one_mul]
+  exact (CliffordAlgebra.equivExterior Q).symm_apply_apply b
+
+/-- Wedging with `1` on the right is the identity. -/
+theorem wedge_one (a : CliffordAlgebra Q) : wedge Q a 1 = a := by
+  unfold wedge
+  rw [equivExterior_one Q, mul_one]
+  exact (CliffordAlgebra.equivExterior Q).symm_apply_apply a
+
+/-- Wedge distributes over addition on the left. -/
+theorem wedge_add (a b c : CliffordAlgebra Q) :
+    wedge Q (a + b) c = wedge Q a c + wedge Q b c := by
+  unfold wedge; simp only [map_add, add_mul, map_add]
+
+/-- Wedge distributes over addition on the right. -/
+theorem add_wedge (a b c : CliffordAlgebra Q) :
+    wedge Q a (b + c) = wedge Q a b + wedge Q a c := by
+  unfold wedge; simp only [map_add, mul_add, map_add]
+
+/-- Scalar multiplication pulls out of the wedge product (left). -/
+theorem smul_wedge (r : R) (a b : CliffordAlgebra Q) :
+    wedge Q (r • a) b = r • wedge Q a b := by
+  unfold wedge; simp only [LinearEquiv.map_smul, Algebra.mul_smul_comm,
+    Algebra.smul_mul_assoc, LinearEquiv.map_smul]
 
 -- ============================================================================
 -- Part E.  Maxwell skeleton — "one line ⇒ grade-1 and grade-3 equations"
@@ -223,6 +377,59 @@ theorem Maxwell_gradeSelect
     ∀ x : X, gradeSelect Q (D F x) r = gradeSelect Q (J x) r :=
   fun x => congrArg (gradeSelect Q · r) (h x)
 
+/-- If the one-line equation holds and `D` is linear (commutes with grade selection),
+then one can extract graded equations directly on `F` and `J`. -/
+theorem Maxwell_gradeSelect_linear
+    (hD_linear : ∀ (f : X → CliffordAlgebra Q) (r : ℕ) (x : X),
+      gradeSelect Q (D f x) r = D (fun y => gradeSelect Q (f y) r) x)
+    (h : Maxwell1Line Q D F J) (r : ℕ) :
+    ∀ x : X, D (fun y => gradeSelect Q (F y) r) x = gradeSelect Q (J x) r :=
+  fun x => by rw [← hD_linear]; exact congrArg (gradeSelect Q · r) (h x)
+
 end MaxwellSkeleton
+
+-- ============================================================================
+-- Part F.  Homogeneous elements and basic grade arithmetic
+-- ============================================================================
+
+/-- An element is *homogeneous of grade `r`* if it lies in `rMultivector Q r`. -/
+def IsHomogeneous (x : CliffordAlgebra Q) (r : ℕ) : Prop :=
+  x ∈ rMultivector Q r
+
+/-- A homogeneous element equals its own grade projection. -/
+theorem IsHomogeneous.gradeSelect_self {x : CliffordAlgebra Q} {r : ℕ}
+    (hx : IsHomogeneous Q x r) : gradeSelect Q x r = x :=
+  (mem_rMultivector_iff_gradeSelect Q x r).mp hx
+
+/-- A homogeneous element of grade `r` vanishes under projection at any other grade. -/
+theorem IsHomogeneous.gradeSelect_ne {x : CliffordAlgebra Q} {r s : ℕ}
+    (hx : IsHomogeneous Q x r) (hrs : r ≠ s) : gradeSelect Q x s = 0 := by
+  rw [← gradeSelect_of_ne Q hrs x]
+  rw [hx.gradeSelect_self]
+
+/-- Zero is homogeneous of every grade. -/
+theorem isHomogeneous_zero (r : ℕ) : IsHomogeneous Q (0 : CliffordAlgebra Q) r := by
+  show (CliffordAlgebra.equivExterior Q) 0 ∈ extGrading (R := R) (M := M) r
+  simp only [map_zero, ZeroMemClass.zero_mem]
+
+/-- The unit is homogeneous of grade 0. -/
+theorem isHomogeneous_one : IsHomogeneous Q (1 : CliffordAlgebra Q) 0 := by
+  show (CliffordAlgebra.equivExterior Q) 1 ∈ extGrading (R := R) (M := M) 0
+  rw [equivExterior_one Q]
+  exact SetLike.one_mem_graded (extGrading (R := R) (M := M))
+
+/-- A vector `ι Q m` is homogeneous of grade 1. -/
+theorem isHomogeneous_ι (m : M) : IsHomogeneous Q (CliffordAlgebra.ι Q m) 1 :=
+  equivExterior_ι_mem_grade1 Q m
+
+/-- A scalar `algebraMap R (Cl Q) a` is homogeneous of grade 0. -/
+theorem isHomogeneous_algebraMap (a : R) :
+    IsHomogeneous Q (algebraMap R (CliffordAlgebra Q) a) 0 :=
+  equivExterior_algebraMap_mem_grade0 Q a
+
+/-- The grade projection is itself homogeneous. -/
+theorem isHomogeneous_gradeSelect (x : CliffordAlgebra Q) (r : ℕ) :
+    IsHomogeneous Q (gradeSelect Q x r) r :=
+  gradeSelect_mem_rMultivector Q x r
 
 end CliffordGA
