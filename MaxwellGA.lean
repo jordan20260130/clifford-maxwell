@@ -171,6 +171,8 @@ noncomputable def proj1 (x : CliffordAlgebra Q) : CliffordAlgebra Q := gradeSele
 noncomputable def proj2 (x : CliffordAlgebra Q) : CliffordAlgebra Q := gradeSelect Q x 2
 /-- The grade-3 ("trivector") part. -/
 noncomputable def proj3 (x : CliffordAlgebra Q) : CliffordAlgebra Q := gradeSelect Q x 3
+/-- The grade-4 ("quadvector") part. -/
+noncomputable def proj4 (x : CliffordAlgebra Q) : CliffordAlgebra Q := gradeSelect Q x 4
 
 /-- Grade-0 projection as a linear map. -/
 noncomputable def proj0L : CliffordAlgebra Q →ₗ[R] CliffordAlgebra Q := gradeSelectL Q 0
@@ -180,6 +182,8 @@ noncomputable def proj1L : CliffordAlgebra Q →ₗ[R] CliffordAlgebra Q := grad
 noncomputable def proj2L : CliffordAlgebra Q →ₗ[R] CliffordAlgebra Q := gradeSelectL Q 2
 /-- Grade-3 projection as a linear map. -/
 noncomputable def proj3L : CliffordAlgebra Q →ₗ[R] CliffordAlgebra Q := gradeSelectL Q 3
+/-- Grade-4 projection as a linear map. -/
+noncomputable def proj4L : CliffordAlgebra Q →ₗ[R] CliffordAlgebra Q := gradeSelectL Q 4
 
 -- ── Linearity over sums ─────────────────────────────────────────────────────
 
@@ -556,5 +560,232 @@ theorem isHomogeneous_sum {ι : Type*} (s : Finset ι) (f : ι → CliffordAlgeb
   show (CliffordAlgebra.equivExterior Q) (∑ i ∈ s, f i) ∈ extGrading (R := R) (M := M) r
   rw [map_sum]
   exact Submodule.sum_mem _ (fun i hi => hf i hi)
+
+-- ============================================================================
+-- Part G.  Grade involution, reversion, and Clifford conjugate
+-- ============================================================================
+
+/-!
+### Grade involution and reversion
+
+The Clifford algebra carries two canonical involutions beyond the identity:
+
+* **Grade involution** (`CliffordAlgebra.involute`): an algebra automorphism
+  that negates vectors (`involute (ι Q m) = -ι Q m`).  On a homogeneous
+  element of grade `r` it acts as multiplication by `(-1)^r`.
+
+* **Reversion** (`CliffordAlgebra.reverse`): a *linear* anti-automorphism
+  that reverses the order of products (`reverse (a * b) = reverse b * reverse a`)
+  while fixing vectors (`reverse (ι Q m) = ι Q m`).
+
+Their composition is the **Clifford conjugate**.
+-/
+
+/-- The Clifford conjugate: `reverse` followed by `involute`.
+
+This is the standard "bar" involution in geometric algebra, often
+written `x̄` or `x†`.  It is the composition of the two fundamental
+involutions and is itself an involution. -/
+noncomputable def cliffordConj : CliffordAlgebra Q →ₗ[R] CliffordAlgebra Q :=
+  CliffordAlgebra.involute.toLinearMap.comp CliffordAlgebra.reverse
+
+omit [Invertible (2 : R)] in
+/-- The Clifford conjugate of a vector negates it. -/
+theorem cliffordConj_ι (m : M) :
+    cliffordConj Q (CliffordAlgebra.ι Q m) = -(CliffordAlgebra.ι Q m) := by
+  simp [cliffordConj, CliffordAlgebra.reverse_ι, CliffordAlgebra.involute_ι]
+
+omit [Invertible (2 : R)] in
+/-- The Clifford conjugate fixes scalars. -/
+theorem cliffordConj_algebraMap (a : R) :
+    cliffordConj Q (algebraMap R (CliffordAlgebra Q) a) =
+      algebraMap R (CliffordAlgebra Q) a := by
+  simp [cliffordConj, CliffordAlgebra.reverse.commutes, AlgHom.commutes]
+
+omit [Invertible (2 : R)] in
+/-- The Clifford conjugate of `1` is `1`. -/
+theorem cliffordConj_one :
+    cliffordConj Q (1 : CliffordAlgebra Q) = 1 := by
+  rw [show (1 : CliffordAlgebra Q) = algebraMap R (CliffordAlgebra Q) 1 from
+    (algebraMap R (CliffordAlgebra Q)).map_one.symm]
+  exact cliffordConj_algebraMap Q 1
+
+omit [Invertible (2 : R)] in
+/-- The Clifford conjugate is an involution. -/
+theorem cliffordConj_involutive :
+    Function.Involutive (cliffordConj Q) := by
+  intro x
+  simp only [cliffordConj, LinearMap.comp_apply, AlgHom.toLinearMap_apply]
+  rw [CliffordAlgebra.reverse_involute]
+  rw [CliffordAlgebra.involute_involute, CliffordAlgebra.reverse_reverse]
+
+omit [Invertible (2 : R)] in
+/-- `involute` preserves the even part. -/
+theorem involute_even {x : CliffordAlgebra Q}
+    (hx : x ∈ CliffordAlgebra.evenOdd Q 0) :
+    CliffordAlgebra.involute x = x :=
+  CliffordAlgebra.involute_eq_of_mem_even hx
+
+omit [Invertible (2 : R)] in
+/-- `involute` negates the odd part. -/
+theorem involute_odd {x : CliffordAlgebra Q}
+    (hx : x ∈ CliffordAlgebra.evenOdd Q 1) :
+    CliffordAlgebra.involute x = -x :=
+  CliffordAlgebra.involute_eq_of_mem_odd hx
+
+-- ── Reversion basic properties (re-exported for convenience) ────────────────
+
+omit [Invertible (2 : R)] in
+/-- `reverse` is an involution. -/
+theorem reverse_reverse (x : CliffordAlgebra Q) :
+    CliffordAlgebra.reverse (CliffordAlgebra.reverse x) = x :=
+  CliffordAlgebra.reverse_reverse x
+
+omit [Invertible (2 : R)] in
+/-- `reverse` is anti-multiplicative. -/
+theorem reverse_mul (a b : CliffordAlgebra Q) :
+    CliffordAlgebra.reverse (a * b) =
+      CliffordAlgebra.reverse b * CliffordAlgebra.reverse a :=
+  CliffordAlgebra.reverse.map_mul a b
+
+-- ============================================================================
+-- Part H.  Wedge product: further properties
+-- ============================================================================
+
+/-- Anticommutativity of the wedge product on vectors:
+`(ι m₁) ⋏ (ι m₂) + (ι m₂) ⋏ (ι m₁) = 0`.
+
+This is the Clifford-algebra transport of `ExteriorAlgebra.ι_add_mul_swap`. -/
+theorem wedge_ι_anticomm (m₁ m₂ : M) :
+    wedge Q (CliffordAlgebra.ι Q m₁) (CliffordAlgebra.ι Q m₂) +
+    wedge Q (CliffordAlgebra.ι Q m₂) (CliffordAlgebra.ι Q m₁) = 0 := by
+  unfold wedge
+  have h₁ : CliffordAlgebra.equivExterior Q (CliffordAlgebra.ι Q m₁) =
+      ExteriorAlgebra.ι R m₁ := by simp
+  have h₂ : CliffordAlgebra.equivExterior Q (CliffordAlgebra.ι Q m₂) =
+      ExteriorAlgebra.ι R m₂ := by simp
+  rw [h₁, h₂]
+  rw [← map_add]
+  rw [ExteriorAlgebra.ι_add_mul_swap]
+  simp
+
+/-- The wedge product of vectors is bilinear on the left. -/
+theorem wedge_ι_add_left (m₁ m₂ : M) (b : CliffordAlgebra Q) :
+    wedge Q (CliffordAlgebra.ι Q (m₁ + m₂)) b =
+    wedge Q (CliffordAlgebra.ι Q m₁) b + wedge Q (CliffordAlgebra.ι Q m₂) b := by
+  simp only [map_add]; exact wedge_add Q _ _ b
+
+/-- The wedge product of vectors is bilinear on the right. -/
+theorem wedge_ι_add_right (a : CliffordAlgebra Q) (m₁ m₂ : M) :
+    wedge Q a (CliffordAlgebra.ι Q (m₁ + m₂)) =
+    wedge Q a (CliffordAlgebra.ι Q m₁) + wedge Q a (CliffordAlgebra.ι Q m₂) := by
+  simp only [map_add]; exact add_wedge Q a _ _
+
+-- ============================================================================
+-- Part I.  Maxwell skeleton: source-free and homogeneous refinements
+-- ============================================================================
+
+namespace MaxwellSkeleton
+
+variable {X : Type*}
+variable (D : (X → CliffordAlgebra Q) → (X → CliffordAlgebra Q))
+variable (F J : X → CliffordAlgebra Q)
+
+/-- Source-free Maxwell: if `J = 0` then every graded component of `D F` vanishes. -/
+theorem Maxwell_sourceFree
+    (h : Maxwell1Line Q D F 0) (r : ℕ) :
+    ∀ x : X, gradeSelect Q (D F x) r = 0 := by
+  intro x
+  have := h x
+  simp only [Pi.zero_apply] at this
+  rw [this]
+  exact gradeSelect_zero Q r
+
+/-- If `D F` is homogeneous of grade `r` at every point and the one-line equation holds,
+then `J` is also homogeneous of grade `r` at every point. -/
+theorem Maxwell_homogeneous_J
+    (h : Maxwell1Line Q D F J) (r : ℕ)
+    (hDF : ∀ x : X, IsHomogeneous Q (D F x) r) :
+    ∀ x : X, IsHomogeneous Q (J x) r :=
+  fun x => by rw [← h x]; exact hDF x
+
+omit [Invertible (2 : R)] in
+/-- If `J = 0` and the one-line equation holds, then `D F = 0` pointwise. -/
+theorem Maxwell_sourceFree_pointwise
+    (h : Maxwell1Line Q D F 0) :
+    ∀ x : X, D F x = 0 := by
+  intro x; exact h x
+
+omit [Invertible (2 : R)] in
+/-- The one-line equation implies `D F - J = 0` pointwise. -/
+theorem Maxwell_residual
+    (h : Maxwell1Line Q D F J) :
+    ∀ x : X, D F x - J x = 0 :=
+  fun x => sub_eq_zero.mpr (h x)
+
+/-- From the one-line equation, grade selection commutes with the equation:
+`gradeSelect (D F x) r - gradeSelect (J x) r = 0`. -/
+theorem Maxwell_gradeSelect_residual
+    (h : Maxwell1Line Q D F J) (r : ℕ) :
+    ∀ x : X, gradeSelect Q (D F x) r - gradeSelect Q (J x) r = 0 := by
+  intro x
+  rw [Maxwell_gradeSelect Q D F J h r x]
+  exact sub_self _
+
+end MaxwellSkeleton
+
+-- ============================================================================
+-- Part J.  Grade-sum decomposition
+-- ============================================================================
+
+/-- Any element equals the sum of its grade-0 and grade-1 projections plus higher terms.
+This is a useful "truncation" statement.  We state it only at the level of grade-select
+being a family of idempotent, mutually orthogonal projections; a full decomposition
+would require finiteness of the module dimension.
+
+For now, we record that the projections partition the element
+in the sense that:
+  `gradeSelect x r + gradeSelect x s` is the grade-`{r,s}` part. -/
+theorem gradeSelect_add_gradeSelect_comm (x : CliffordAlgebra Q) (r s : ℕ) :
+    gradeSelect Q x r + gradeSelect Q x s =
+    gradeSelect Q x s + gradeSelect Q x r :=
+  add_comm _ _
+
+/-- The grade-`r` projection of a sum of two projections at different grades
+selects exactly the matching one. -/
+theorem gradeSelect_add_of_ne {r s : ℕ} (hrs : r ≠ s) (x : CliffordAlgebra Q) :
+    gradeSelect Q (gradeSelect Q x r + gradeSelect Q x s) r =
+    gradeSelect Q x r := by
+  rw [gradeSelect_add, gradeSelect_idem, gradeSelect_of_ne Q (Ne.symm hrs), add_zero]
+
+/-- The grade-`s` projection of a sum of two projections at different grades
+selects exactly the matching one. -/
+theorem gradeSelect_add_of_ne' {r s : ℕ} (hrs : r ≠ s) (x : CliffordAlgebra Q) :
+    gradeSelect Q (gradeSelect Q x r + gradeSelect Q x s) s =
+    gradeSelect Q x s := by
+  rw [gradeSelect_add, gradeSelect_of_ne Q hrs, gradeSelect_idem, zero_add]
+
+/-- An element that is a sum of two homogeneous parts of different grades
+can be decomposed by grade selection. -/
+theorem IsHomogeneous.add_decompose {x y : CliffordAlgebra Q} {r s : ℕ}
+    (hrs : r ≠ s) (hx : IsHomogeneous Q x r) (hy : IsHomogeneous Q y s) :
+    gradeSelect Q (x + y) r = x := by
+  unfold gradeSelect
+  simp only [map_add, GradedAlgebra.proj_apply]
+  rw [DirectSum.decompose_of_mem_same (extGrading (R := R) (M := M)) hx]
+  rw [DirectSum.decompose_of_mem_ne (extGrading (R := R) (M := M)) hy (Ne.symm hrs)]
+  simp only [ZeroMemClass.coe_zero, map_add, map_zero, add_zero,
+    LinearEquiv.symm_apply_apply]
+
+/-- The symmetric version of the above. -/
+theorem IsHomogeneous.add_decompose' {x y : CliffordAlgebra Q} {r s : ℕ}
+    (hrs : r ≠ s) (hx : IsHomogeneous Q x r) (hy : IsHomogeneous Q y s) :
+    gradeSelect Q (x + y) s = y := by
+  unfold gradeSelect
+  simp only [map_add, GradedAlgebra.proj_apply]
+  rw [DirectSum.decompose_of_mem_ne (extGrading (R := R) (M := M)) hx hrs]
+  rw [DirectSum.decompose_of_mem_same (extGrading (R := R) (M := M)) hy]
+  simp only [ZeroMemClass.coe_zero, map_add, map_zero, zero_add,
+    LinearEquiv.symm_apply_apply]
 
 end CliffordGA
